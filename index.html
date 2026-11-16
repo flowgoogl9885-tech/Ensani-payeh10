@@ -269,7 +269,7 @@ body::before,.hero::after,.bar i{animation:none}
   if(window.claude&&window.claude.use)return;
   /* ===== آدرس دیتابیس Firebase Realtime Database را بین کوتیشن‌ها بگذار، مثلا: https://myapp-default-rtdb.firebaseio.com ===== */
   var FBL=["https://jame-c28d5-default-rtdb.firebaseio.com"],FB=FBL[0],pk=null;
-  function pick(){return pk||(pk=Promise.all(FBL.map(function(u){return fetch(u+"/.json?shallow=true").then(function(r){return r.ok||r.status===401?u:null}).catch(function(){return null})})).then(function(a){FB=a.filter(Boolean)[0]||FBL[0]}))}
+  function pick(){if(FBL.length===1)return Promise.resolve();return pk||(pk=Promise.all(FBL.map(function(u){return fetch(u+"/.json?shallow=true").then(function(r){return r.ok||r.status===401?u:null}).catch(function(){return null})})).then(function(a){FB=a.filter(Boolean)[0]||FBL[0]}))}
   if(FB){
     var cache={},srcs={},subs2=[],tm={},got={};
     var dbgEl=document.createElement("div"),dbgL=[];dbgEl.style.cssText="position:fixed;left:4px;bottom:4px;z-index:99999;background:rgba(0,0,0,.82);color:#7CFC00;font:11px/1.4 monospace;padding:4px 7px;border-radius:6px;max-width:92vw;direction:ltr;text-align:left;pointer-events:none;white-space:pre-wrap";
@@ -279,7 +279,7 @@ body::before,.hero::after,.bar i{animation:none}
     function setp(o,ps,v){if(!ps.length)return v;o=Array.isArray(o)?o.slice():Object.assign({},o||{});var k=ps[0];if(ps.length===1&&v===null)delete o[k];else o[k]=setp(o[k],ps.slice(1),v);return o}
     function emit(col){clearTimeout(tm[col]);tm[col]=setTimeout(function(){got[col]=1;var o=cache[col]||{};var docs=Object.keys(o).filter(function(k){return o[k]&&typeof o[k]==="object"}).map(function(k){return{id:k,data:function(){return o[k]}}});subs2.filter(function(s){return s.col===col}).forEach(function(s){s.ok({docs:docs})})},15)}
     function open(col){
-      if(srcs[col])return;cache[col]={};var es=new EventSource(FB+"/"+col+".json");srcs[col]=es;setTimeout(function(){if(!got[col])resync(col,true)},2500);
+      if(srcs[col])return;cache[col]={};var es=new EventSource(FB+"/"+col+".json");srcs[col]=es;resync(col,true);setTimeout(function(){if(!got[col])resync(col,true)},2500);
       function on(e){var m;try{m=JSON.parse(e.data)}catch(x){return}var p=m.path==="/"?[]:m.path.split("/").filter(Boolean);
         if(e.type==="put")cache[col]=setp(cache[col],p,m.data===undefined?null:m.data)||{};
         else Object.keys(m.data||{}).forEach(function(k){cache[col]=setp(cache[col],p.concat(k.split("/")),m.data[k])||{}});
@@ -289,7 +289,7 @@ body::before,.hero::after,.bar i{animation:none}
     }
     function resync(col,force){fetch(FB+"/"+col+".json",{cache:"no-store"}).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){d=d||{};L("read "+col+" n="+Object.keys(d).length);var ch=JSON.stringify(d)!==JSON.stringify(cache[col]);cache[col]=d;if(ch||force||!got[col])emit(col)}).catch(function(){})}
     function wr(col,id,method,body,next){open(col);cache[col]=setp(cache[col]||{},[id],next);emit(col);
-      return fetch(FB+"/"+col+"/"+encodeURIComponent(id)+".json",{method:method,headers:{"Content-Type":"application/json"},body:body}).then(function(r){if(!r.ok){var e=new Error("http");e.code=r.status;throw e}L("write ok "+col)}).catch(function(e){L("write FAIL "+col+" "+((e&&e.code)||(e&&e.message)||"net"));resync(col,true);throw e})}
+      return fetch(FB+"/"+col+"/"+encodeURIComponent(id)+".json",{method:method,headers:{"Content-Type":"application/json"},body:body}).then(function(r){if(!r.ok){var e=new Error("http");e.code=r.status;throw e}L("write ok "+col);try{if(col==="questions"||col==="exams")document.title="✓ ذخیره شد"}catch(_){}}).catch(function(e){L("write FAIL "+col+" "+((e&&e.code)||(e&&e.message)||"net"));resync(col,true);throw e})}
     window.claude={use:function(n){return n!=="db"?Promise.reject(new Error("unavailable")):pick().then(function(){return{collection:function(col){return{
       doc:function(id){return{set:function(data){return wr(col,id,"PUT",JSON.stringify(data),data)},delete:function(){return wr(col,id,"DELETE",undefined,null)}}},
       onSnapshot:function(ok,err){var s={col:col,ok:ok,err:err};subs2.push(s);open(col);if(got[col])emit(col);return function(){subs2=subs2.filter(function(x){return x!==s})}}}}}})}};
@@ -371,7 +371,7 @@ function sub(k){
   try{db.collection(COL[k]).onSnapshot(s=>{S[k]=s.docs.map(d=>({id:d.id,...d.data()}));errs[k]=false;loaded[k]=true;if((k==="q"||k==="e")&&S[k].length)ls.set("bk_"+k,S[k]);heal();draw()},()=>{errs[k]=true;draw()})}catch(e){errs[k]=true}
 }
 function put(k,id,data){
-  if(db){bkUp(k,id,data);return db.collection(COL[k]).doc(id).set(data).catch(e=>{errs.w=true;try{toast("ذخیره نشد - کد خطا: "+((e&&e.code)||(e&&e.message)||"?"))}catch(x){}draw()})}
+  if(db){bkUp(k,id,data);return db.collection(COL[k]).doc(id).set(data).catch(e=>{errs.w=true;try{alert("ذخیره نشد - کد خطا: "+((e&&e.code)||(e&&e.message)||"?")+" - "+k)}catch(x){}draw()})}
   const i=S[k].findIndex(x=>x.id===id);const o={id,...data};i>=0?S[k][i]=o:S[k].push(o);persist(k);draw();return Promise.resolve();
 }
 function del(k,id){
@@ -389,7 +389,7 @@ function sync(){
   try{db=await claude.use("db")}catch(e){}
   if(!uid){uid=ls.get("uid")||("g"+Math.random().toString(36).slice(2,10));ls.set("uid",uid)}
   ready=true;
-  if(db){sub("q");sub("e");sub("b");sync()}else loadLocal();
+  if(db){try{["q","e"].forEach(k=>{const b=ls.get("bk_"+k);if(b&&b.length)S[k]=k==="e"?b.map(x=>({...x,live:false})):b});draw()}catch(e){}sub("q");sub("e");sub("b");sync()}else loadLocal();
   if(unlocked)subAdmin();draw();
 })();
 function subAdmin(){heal();if(subAdm)return;subAdm=true;if(db){sub("v");sub("r");sub("a")}}
